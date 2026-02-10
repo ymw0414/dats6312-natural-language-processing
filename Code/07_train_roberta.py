@@ -12,9 +12,9 @@ Outputs:
 """
 
 import argparse
+import random
 import time
 from pathlib import Path
-import random
 
 import numpy as np
 import torch
@@ -25,7 +25,8 @@ from transformers import (
     RobertaTokenizerFast,
     get_linear_schedule_with_warmup,
 )
-from sklearn.metrics import accuracy_score, f1_score
+
+from utils import ModelEvaluator, get_device
 
 
 def set_seed(seed: int):
@@ -34,14 +35,6 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
-
-def get_device():
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
 
 
 def load_tokenized_dataset(path: Path):
@@ -61,7 +54,7 @@ def load_tokenized_dataset(path: Path):
     return concatenate_datasets(datasets)
 
 
-def evaluate(model, dataloader, device):
+def evaluate_roberta(model, dataloader, device):
     model.eval()
     all_labels = []
     all_preds = []
@@ -81,9 +74,7 @@ def evaluate(model, dataloader, device):
             all_labels.extend(batch["labels"].cpu().numpy())
             all_preds.extend(preds.cpu().numpy())
 
-    acc = accuracy_score(all_labels, all_preds)
-    f1_r = f1_score(all_labels, all_preds, pos_label=1)
-    return acc, f1_r
+    return all_labels, all_preds
 
 
 def main(args):
@@ -93,10 +84,8 @@ def main(args):
 
     tokenized_path = Path(args.tokenized_path)
     model_dir = Path(args.model_dir)
-    eval_dir = Path(args.eval_dir)
 
     model_dir.mkdir(parents=True, exist_ok=True)
-    eval_dir.mkdir(parents=True, exist_ok=True)
 
     print("Loading tokenized dataset...")
     dataset = load_tokenized_dataset(tokenized_path)
@@ -135,6 +124,8 @@ def main(args):
     )
 
     scaler = torch.cuda.amp.GradScaler(enabled=(device.type == "cuda"))
+
+    evaluator = ModelEvaluator(args.eval_dir)
 
     print("Starting training...")
     for epoch in range(args.epochs):
@@ -185,21 +176,26 @@ def main(args):
                     f"Loss {total_loss/(step+1):.4f} | ETA {eta/60:.2f} min"
                 )
 
-        val_acc, val_f1 = evaluate(model, valid_loader, device)
-        print(f"Validation acc: {val_acc:.4f}, F1 (R): {val_f1:.4f}")
+        val_labels, val_preds = evaluate_roberta(model, valid_loader, device)
+        val_metrics = evaluator.compute_metrics(val_labels, val_preds, pos_label=1)
+        print(f"Validation acc: {val_metrics['accuracy']:.4f}, F1 (R): {val_metrics['f1']:.4f}")
 
-    test_acc, test_f1 = evaluate(model, test_loader, device)
-    print(f"Test accuracy: {test_acc:.4f} | Test F1 (R): {test_f1:.4f}")
+    test_labels, test_preds = evaluate_roberta(model, test_loader, device)
+    test_metrics = evaluator.compute_metrics(test_labels, test_preds, pos_label=1)
+    print(f"Test accuracy: {test_metrics['accuracy']:.4f} | Test F1 (R): {test_metrics['f1']:.4f}")
+
+    evaluator.save_report(test_metrics, "roberta_metrics.txt", header="RoBERTa Test Metrics")
+    evaluator.plot_confusion_matrix(
+        test_metrics["confusion_matrix"],
+        labels=["D", "R"],
+        filename="roberta_confusion_matrix.png",
+        title="RoBERTa Confusion Matrix (Test)",
+    )
 
     model.save_pretrained(str(model_dir))
     tokenizer.save_pretrained(str(model_dir))
 
-    with open(eval_dir / "roberta_metrics.txt", "w") as f:
-        f.write(f"Test accuracy: {test_acc:.6f}\n")
-        f.write(f"Test F1 (R): {test_f1:.6f}\n")
-
     print("Saved model to:", model_dir)
-    print("Saved metrics to:", eval_dir / "roberta_metrics.txt")
 
 
 if __name__ == "__main__":

@@ -11,41 +11,18 @@ Output:
     data/processed/speaker_map.parquet
 """
 
-import pandas as pd
-from pathlib import Path
 import argparse
+from pathlib import Path
 
-
-def load_speaker_map(raw_dir: Path) -> pd.DataFrame:
-    all_rows = []
-
-    for i in range(43, 112):
-        suffix = f"{i:03d}"
-        file = raw_dir / f"SpeakerMap_{suffix}.txt"
-
-        if not file.exists():
-            print("skip:", file)
-            continue
-
-        df = pd.read_csv(
-            file,
-            sep="|",
-            header=None,
-            names=["speech_id", "speaker", "state", "party"],
-            dtype=str,
-            encoding="cp1252",
-        )
-        all_rows.append(df)
-
-    return pd.concat(all_rows, ignore_index=True)
+from utils import CongressionalDataLoader
 
 
 def main(args):
-    raw_dir = Path(args.raw_dir)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    speaker_map = load_speaker_map(raw_dir)
+    loader = CongressionalDataLoader(args.raw_dir)
+    speaker_map = loader.load_speaker_map()
 
     out_path = out_dir / "speaker_map.parquet"
     speaker_map.to_parquet(out_path)

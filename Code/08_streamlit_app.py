@@ -3,6 +3,8 @@ from pathlib import Path
 import torch
 from transformers import RobertaTokenizerFast, RobertaForSequenceClassification
 
+from utils import get_device
+
 # -----------------------------
 # PAGE CONFIG
 # -----------------------------
@@ -20,14 +22,6 @@ MODEL_DIR = Path("models/roberta_1980s_paragraph")
 # -----------------------------
 # DEVICE
 # -----------------------------
-@st.cache_resource
-def get_device():
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
-
 device = get_device()
 
 # -----------------------------

@@ -11,17 +11,16 @@ Outputs:
     models/logreg_model.pkl
 """
 
-import pandas as pd
+import argparse
 import pickle
 from pathlib import Path
-import argparse
 
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
 
-import matplotlib.pyplot as plt
+from utils import ModelEvaluator
 
 
 def train_baseline(df: pd.DataFrame):
@@ -63,52 +62,33 @@ def train_baseline(df: pd.DataFrame):
     )
 
 
-def evaluate(model, X, y):
-    pred = model.predict(X)
-    acc = accuracy_score(y, pred)
-    f1 = f1_score(y, pred, pos_label="R")
-    report = classification_report(y, pred)
-    cm = confusion_matrix(y, pred)
-    return acc, f1, report, cm
-
-
 def main(args):
     data_path = Path(args.data_path)
     model_dir = Path(args.model_dir)
-    eval_dir = Path(args.eval_dir)
 
     model_dir.mkdir(parents=True, exist_ok=True)
-    eval_dir.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_parquet(data_path)
     print("Loaded:", df.shape)
 
     clf, vectorizer, val_set, test_set = train_baseline(df)
 
-    val_acc, val_f1, val_report, _ = evaluate(clf, *val_set)
-    test_acc, test_f1, test_report, cm = evaluate(clf, *test_set)
+    evaluator = ModelEvaluator(args.eval_dir)
 
-    metrics_path = eval_dir / "baseline_metrics.txt"
-    with open(metrics_path, "w") as f:
-        f.write("Validation Metrics\n")
-        f.write(f"Accuracy: {val_acc}\n")
-        f.write(f"F1: {val_f1}\n")
-        f.write(val_report)
-        f.write("\n\nTest Metrics\n")
-        f.write(f"Accuracy: {test_acc}\n")
-        f.write(f"F1: {test_f1}\n")
-        f.write(test_report)
+    val_metrics = evaluator.compute_metrics(val_set[1], clf.predict(val_set[0]))
+    test_metrics = evaluator.compute_metrics(test_set[1], clf.predict(test_set[0]))
 
-    print("Saved metrics:", metrics_path)
+    evaluator.save_report(val_metrics, "baseline_val_metrics.txt", header="Validation Metrics")
+    evaluator.save_report(test_metrics, "baseline_test_metrics.txt", header="Test Metrics")
+    evaluator.plot_confusion_matrix(
+        test_metrics["confusion_matrix"],
+        labels=["D", "R"],
+        filename="baseline_confusion_matrix.png",
+        title="Baseline Confusion Matrix (Test)",
+    )
 
-    plt.figure(figsize=(5, 4))
-    plt.imshow(cm)
-    plt.title("Confusion Matrix (Test)")
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
-    plt.colorbar()
-    plt.savefig(eval_dir / "confusion_matrix.png")
-    plt.close()
+    print(f"Val  — Accuracy: {val_metrics['accuracy']:.4f}, F1: {val_metrics['f1']:.4f}")
+    print(f"Test — Accuracy: {test_metrics['accuracy']:.4f}, F1: {test_metrics['f1']:.4f}")
 
     with open(model_dir / "tfidf_vectorizer.pkl", "wb") as f:
         pickle.dump(vectorizer, f)

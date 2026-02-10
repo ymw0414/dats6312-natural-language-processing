@@ -11,42 +11,18 @@ Output:
     data/processed/speeches_merged.parquet
 """
 
-import pandas as pd
-from pathlib import Path
 import argparse
+from pathlib import Path
 
-
-def load_speeches(raw_dir: Path) -> pd.DataFrame:
-    all_rows = []
-
-    for i in range(43, 112):
-        suffix = f"{i:03d}"
-        file = raw_dir / f"speeches_{suffix}.txt"
-
-        if not file.exists():
-            print("skip:", file)
-            continue
-
-        with open(file, "r", encoding="cp1252") as f:
-            next(f)  # skip header
-
-            for line in f:
-                parts = line.rstrip("\n").split("|", 1)
-                if len(parts) != 2:
-                    continue
-
-                speech_id, speech = parts
-                all_rows.append((speech_id.strip(), speech.strip(), suffix))
-
-    return pd.DataFrame(all_rows, columns=["speech_id", "speech", "file_id"])
+from utils import CongressionalDataLoader
 
 
 def main(args):
-    raw_dir = Path(args.raw_dir)
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    df = load_speeches(raw_dir)
+    loader = CongressionalDataLoader(args.raw_dir)
+    df = loader.load_speeches()
 
     out_path = out_dir / "speeches_merged.parquet"
     df.to_parquet(out_path)
