@@ -6,12 +6,14 @@ Binary classification of U.S. Congressional speeches as **Democrat** or **Republ
 
 ## Results
 
-| Model | Accuracy | F1 (Republican) |
-|-------|----------|-----------------|
-| TF-IDF + Logistic Regression | _TBD_ | _TBD_ |
-| RoBERTa-base (3 epochs) | _TBD_ | _TBD_ |
+| Model | Data Filter | Epochs | Accuracy | F1 |
+|-------|------------|--------|----------|-----|
+| TF-IDF + Logistic Regression | Yes | N/A | 0.694 | 0.692 |
+| RoBERTa-base | Yes | 1 | 0.692 | 0.679 |
+| RoBERTa-base | Yes | 2 | 0.715 | 0.699 |
+| **RoBERTa-base** | **Yes** | **3** | **0.729** | **0.713** |
 
-> Update the table above with actual metrics from `evaluation/` after running the pipeline.
+> Data filter: paragraph-level quality filtering (>=2 sentences, >=200 characters), resulting in ~0.39M speech samples from the 1980s (97th-100th Congress).
 
 ## Repository Structure
 
