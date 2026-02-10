@@ -15,6 +15,8 @@ Binary classification of U.S. Congressional speeches as **Democrat** or **Republ
 
 > Data filter: paragraph-level quality filtering (>=2 sentences, >=200 characters), resulting in ~0.39M speech samples from the 1980s (97th-100th Congress).
 
+**Why ~70% accuracy?** The training data covers the 1980s, a period when partisan language in Congress was far less polarized than today. Democrats and Republicans used much more overlapping vocabulary and rhetorical styles, making the classification task inherently harder. Research on congressional polarization (e.g., Gentzkow, Shapiro, and Taddy 2019) confirms that linguistic divergence between parties accelerated sharply from the mid-1990s onward. The relatively moderate accuracy reflects this historical reality rather than a model limitation.
+
 ## Repository Structure
 
 ```
